@@ -10,6 +10,19 @@ import time
 import io
 import picamera
 
+# https://github.com/waveform80/picamera/issues/383
+def _monkey_patch_picamera():
+    original_send_buffer = picamera.mmalobj.MMALPortPool.send_buffer
+
+    def silent_send_buffer(zelf, *args, **kwargs):
+        try:
+            original_send_buffer(zelf, *args, **kwargs)
+        except picamera.exc.PiCameraMMALError as error:
+            if error.status != 14:
+                raise error
+
+    picamera.mmalobj.MMALPortPool.send_buffer = silent_send_buffer
+
 def ReadLabelFile(file_path):
     with open(file_path, 'r', encoding="utf-8") as f:
         lines = f.readlines()
@@ -19,7 +32,7 @@ def ReadLabelFile(file_path):
         ret[int(pair[0])] = pair[1].strip()
     return ret
 
-
+# wget https://dl.google.com/coral/canned_models/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite
 model_filename = "mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
 label_filename = "coco_labels.txt"
 engine = DetectionEngine(model_filename)
@@ -34,12 +47,13 @@ CAMERA_HEIGHT = 480
 fnt = ImageFont.load_default()
 
 with picamera.PiCamera() as camera:
+    _monkey_patch_picamera()
     camera.resolution = (CAMERA_WIDTH, CAMERA_HEIGHT)
-    camera.framerate = 30
+    camera.framerate = 15
     camera.rotation = 180
     _, width, height, channels = engine.get_input_tensor_shape()
     print("{}, {}".format(width, height))
-    o = None
+    overlay_renderer = None
     camera.start_preview()
     try:
         stream = io.BytesIO()
@@ -69,17 +83,17 @@ with picamera.PiCamera() as camera:
                     box[1] *= CAMERA_HEIGHT
                     box[2] *= CAMERA_WIDTH
                     box[3] *= CAMERA_HEIGHT
-                    print(box)
-                    print(labels[obj.label_id])
+                    # print(box)
+                    # print(labels[obj.label_id])
                     draw.rectangle(box, outline='red')
                     draw.text((box[0], box[1]-10), labels[obj.label_id], font=fnt, fill="red") 
-                if not o:
-                    o = camera.add_overlay(img.tobytes(), size=(CAMERA_WIDTH, CAMERA_HEIGHT), layer=3, alpha=255)
-                else:
-                    o.update(img.tobytes())
                 camera.annotate_text = "{0:.2f}ms".format(elapsed_ms*1000.0)
+            if not overlay_renderer:
+                overlay_renderer = camera.add_overlay(img.tobytes(), size=(CAMERA_WIDTH, CAMERA_HEIGHT), layer=4, alpha=255)
+            else:
+                overlay_renderer.update(img.tobytes())
     finally:
-        if o:
-            camera.remove_overlay(o)
+        if overlay_renderer:
+            camera.remove_overlay(overlay_renderer)
         camera.stop_preview()
 
