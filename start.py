@@ -2,8 +2,8 @@
 Object detection demo.
 
 This demo script requires Raspberry Pi Camera, and pre-compiled mode.
-Get pre-compiled model from Coral website [1]
-[1]: https://dl.google.com/coral/canned_models/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite
+Get pre-compiled model from Coral website.
+$ wget https://dl.google.com/coral/canned_models/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite
 """
 
 from edgetpu.detection.engine import DetectionEngine
@@ -14,6 +14,7 @@ import numpy as np
 import time
 import io
 import picamera
+from motor import MotorController
 
 
 # https://github.com/waveform80/picamera/issues/383
@@ -43,6 +44,8 @@ def _read_label_file(file_path):
 
 # Main loop
 def main():
+    mot = MotorController()
+
     model_filename = "mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
     label_filename = "coco_labels.txt"
     engine = DetectionEngine(model_filename)
@@ -81,25 +84,46 @@ def main():
                                 (CAMERA_WIDTH, CAMERA_HEIGHT),
                                 (255, 0, 0, 0))
                 draw = ImageDraw.Draw(img)
+                draw.line((CAMERA_WIDTH//2, 0, CAMERA_WIDTH//2, CAMERA_HEIGHT), width=1)
+                draw.line((CAMERA_WIDTH//4, 0, CAMERA_WIDTH//4, CAMERA_HEIGHT), width=1)
+                draw.line((3*CAMERA_WIDTH//4, 0, 3*CAMERA_WIDTH//4, CAMERA_HEIGHT), width=1)
 
                 # Run detection
                 start_ms = time.time()
                 results = engine.DetectWithImage(image,
-                                                 threshold=0.2, top_k=10)
+                                                 threshold=0.2, top_k=5)
                 elapsed_ms = (time.time() - start_ms)*1000.0
+                obj = None
                 if results:
-                    for obj in results:
-                        box = obj.bounding_box.flatten().tolist()
-                        box[0] *= CAMERA_WIDTH
-                        box[1] *= CAMERA_HEIGHT
-                        box[2] *= CAMERA_WIDTH
-                        box[3] *= CAMERA_HEIGHT
-                        # print(box)
-                        # print(labels[obj.label_id])
-                        draw.rectangle(box, outline='red')
-                        draw.text((box[0], box[1]-10), labels[obj.label_id],
-                                  font=fnt, fill="red")
+                    obj = next((x for x in results if labels[x.label_id] == "banana"), None)
+
+                if obj:
+                    box = obj.bounding_box.flatten().tolist()
+                    box[0] *= CAMERA_WIDTH
+                    box[1] *= CAMERA_HEIGHT
+                    box[2] *= CAMERA_WIDTH
+                    box[3] *= CAMERA_HEIGHT
+                    draw.rectangle(box, outline='red')
+                    draw.text((box[0], box[1]-10), labels[obj.label_id],
+                              font=fnt, fill="red")
+                    obj_width = box[2] - box[0]
+                    obj_center = box[0] + obj_width // 2
+                    draw.point((obj_center, box[1] + (box[3] - box[1])//2))
+                    print(obj_center - CAMERA_WIDTH // 2)
+                    if (obj_center - CAMERA_WIDTH // 2) > CAMERA_WIDTH // 4:
+                        print("TURN R")
+                        mot.turn_r(radius=30)
+                    elif (obj_center - CAMERA_WIDTH // 2) < -CAMERA_WIDTH // 4:
+                        print("TURN L")
+                        mot.turn_l(radius=30)
+                    elif obj_width < CAMERA_WIDTH / 4:
+                        print("FORWARD")
+                        mot.forward()
+                    else:
+                        mot.stop()
                     camera.annotate_text = "{0:.2f}ms".format(elapsed_ms)
+                else:
+                    mot.stop()
                 if not overlay_renderer:
                     overlay_renderer = camera.add_overlay(
                         img.tobytes(),
@@ -107,6 +131,7 @@ def main():
                 else:
                     overlay_renderer.update(img.tobytes())
         finally:
+            mot.stop()
             if overlay_renderer:
                 camera.remove_overlay(overlay_renderer)
             camera.stop_preview()
