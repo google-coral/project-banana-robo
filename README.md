@@ -23,7 +23,7 @@ rectangles (see attached image).
 Today you can easily implement object detection because these technologies are
 mostly using deep learning, and pre-trained models are provided by several sources.
 
-![](media/objectdetection.gif)
+![](media/objectdetection.png)
 
 ## Raspberry Pi + Coral USB Accelerator + MobileNet SSD v2
 
