@@ -7,13 +7,13 @@ This project was built by Hayato Yoshikawa and originally published in a
 [Medium blog post](https://medium.com/@hayatoy/making-a-banana-seeker-robot-with-coral-edge-tpu-169c993fc370)
 
 
-![](demo.gif)
+![](media/demo.gif)
 
 ## How does it work?
 
 This robot is built on Raspberry Pi 3 B+ connecting L298N motor driver that drives 2 motors, and detecting object with camera accelerated by Coral USB Accelerator.
 
-![](layout.gif)
+![](media/layout.gif)
 
 ## Object Detection
 
@@ -23,7 +23,7 @@ rectangles (see attached image).
 Today you can easily implement object detection because these technologies are
 mostly using deep learning, and pre-trained models are provided by several sources.
 
-![](objectdetection.gif)
+![](media/objectdetection.gif)
 
 ## Raspberry Pi + Coral USB Accelerator + MobileNet SSD v2
 
@@ -107,18 +107,18 @@ GPIO.output(15, GPIO.LOW)
 GPIO.output(18, GPIO.HIGH)
 ```
 
-![](motordriver.jpeg)
+![](media/motordriver.jpeg)
 
 If you are interested in the mechanism of this driver, refer to 
 [this tutorial](https://howtomechatronics.com/tutorials/arduino/arduino-dc-motor-control-tutorial-l298n-pwm-h-bridge/).
 
 ## Simple Logic to Seek a Banana
 
-![](objectapproach.png)
+![](media/objectapproach.png)
 
 ## Wrap up — why on edge? why need accelerator?
 
-![](bananaseeker.jpeg)
+![](media/bananaseeker.jpeg)
 
 You may wonder why we use object detection model on Edge TPU instead of Cloud
 nor CPU? It depends on what application you need. In this application the robot
